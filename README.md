@@ -2,9 +2,6 @@
 
 Bluetooth low-energy GATT client/server units for ezmsg. 
 
-## Installation
-`pip install ezmsg-ble`
-
 ## Dependencies
 * `ezmsg`
 * `bleak` (for the client)
