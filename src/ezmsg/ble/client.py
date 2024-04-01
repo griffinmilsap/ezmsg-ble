@@ -15,7 +15,7 @@ import ezmsg.core as ez
 from ezmsg.sigproc.sampler import SampleTriggerMessage
 from ezmsg.util.messagecodec import MessageEncoder, MessageDecoder
 
-from .topic_server import gen_characteristic_uuid
+from .server import gen_characteristic_uuid
 
 class BLETopicClientSettings(ez.Settings):
     topic: str

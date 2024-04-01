@@ -7,7 +7,7 @@ import ezmsg.core as ez
 def server(topic_name: str) -> None:
 
     from ezmsg.util.debuglog import DebugLog
-    from ezmsg.ble.topic_server import BLETopicServer, BLETopicServerSettings
+    from ezmsg.ble.server import BLETopicServer, BLETopicServerSettings
     
     class Counter(ez.Unit):
 
@@ -43,7 +43,7 @@ def server(topic_name: str) -> None:
 
 def client(topic_name: str) -> None:
 
-    from ezmsg.ble.topic_client import BLETopicClient, BLETopicClientSettings
+    from ezmsg.ble.client import BLETopicClient, BLETopicClientSettings
 
     class Loopback(ez.Unit):
 
