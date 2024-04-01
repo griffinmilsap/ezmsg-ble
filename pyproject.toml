@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "ezmsg-ble"
+version = "0.1.0"
+description = "Bluetooth Low-energy GATT client/server for ezmsg"
+authors = [
+  "Milsap, Griffin <griffin.milsap@gmail.com>",
+]
+license = "MIT"
+readme = "README.md"
+packages = [{ include = "ezmsg", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.8,<3.12"
+ezmsg = "^3.3.3"
+bless = "^0.2.6"
+bleak = "^0.21.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
