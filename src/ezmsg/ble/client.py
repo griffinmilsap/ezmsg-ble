@@ -18,6 +18,7 @@ from ezmsg.util.messagecodec import MessageEncoder, MessageDecoder
 from .server import gen_characteristic_uuid
 
 class BLETopicClientSettings(ez.Settings):
+    device: str
     topic: str
     connect_retries: int = 3
 
@@ -39,7 +40,7 @@ class BLETopicClient(ez.Unit):
     @ez.task
     async def handle_connection(self) -> None:
         while True:
-            name = self.SETTINGS.topic
+            name = self.SETTINGS.device
             ez.logger.info(f"Looking for BLE device/server: {name}")
             device = None
             while device is None:
