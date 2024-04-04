@@ -80,7 +80,6 @@ class BLETopicClient(ez.Unit):
                 self.STATE.characteristic_uuid = gen_characteristic_uuid(self.SETTINGS.topic)
                 
                 async def callback_handler(characteristic: BleakGATTCharacteristic, data: bytearray) -> None:
-                    print(characteristic.uuid, str(self.STATE.characteristic_uuid))
                     if characteristic.uuid == str(self.STATE.characteristic_uuid):
                         await self.STATE.queue.put(bytes(data).decode())
 
