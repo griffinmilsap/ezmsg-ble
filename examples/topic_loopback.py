@@ -4,7 +4,12 @@ import typing
 
 import ezmsg.core as ez
 
-def server(topic_name: str) -> None:
+class Args:
+    topic: str
+    device: str
+    server: bool
+
+def server(args: Args) -> None:
 
     from ezmsg.util.debuglog import DebugLog
     from ezmsg.ble.server import BLETopicServer, BLETopicServerSettings
@@ -26,7 +31,7 @@ def server(topic_name: str) -> None:
 
     topic_server = BLETopicServer(
         BLETopicServerSettings(
-            topic = topic_name
+            topic = args.topic
         )
     )
 
@@ -41,9 +46,10 @@ def server(topic_name: str) -> None:
         )
     )
 
-def client(topic_name: str) -> None:
+def client(args: Args) -> None:
 
     from ezmsg.ble.client import BLETopicClient, BLETopicClientSettings
+    from ezmsg.util.debuglog import DebugLog
 
     class Loopback(ez.Unit):
 
@@ -57,19 +63,23 @@ def client(topic_name: str) -> None:
 
     topic_client = BLETopicClient(
         BLETopicClientSettings(
-            topic = topic_name
+            device = args.device,
+            topic = args.topic
         )
     )
 
+    log = DebugLog()
     loopback = Loopback()
 
     ez.run(
+        LOG = log,
         CLIENT = topic_client,
         LOOPBACK = loopback,
 
         connections = (
             (topic_client.INCOMING_BROADCAST, loopback.INPUT),
-            (loopback.OUTPUT, topic_client.UPDATE)
+            (loopback.OUTPUT, topic_client.UPDATE),
+            (loopback.OUTPUT, log.INPUT)
         )
     )
 
@@ -86,16 +96,20 @@ if __name__ == '__main__':
     )
 
     parser.add_argument(
+        '--device',
+        help = 'device to search for/connect to (client only)',
+        default = ''
+    )
+
+    parser.add_argument(
         '--server', 
         action = 'store_true',
         help = 'run topic server'
     )
 
-    class Args:
-        topic: str
-        server: bool
+
 
     args = parser.parse_args(namespace = Args)
 
     main = server if args.server else client
-    main(args.topic)
+    main(args)
