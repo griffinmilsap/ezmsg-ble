@@ -4,6 +4,7 @@ import typing
 import hashlib
 import asyncio
 import typing
+import platform
 
 from bless import ( 
     BlessServer, # type: ignore
@@ -52,7 +53,7 @@ class BLETopicServer(ez.Unit):
         self.STATE.incoming_queue = asyncio.Queue()
 
         self.STATE.server = BlessServer(
-            name = self.SETTINGS.topic,
+            name = platform.node(),
             loop = asyncio.get_running_loop()
         )
 
