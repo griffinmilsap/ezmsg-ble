@@ -107,8 +107,6 @@ if __name__ == '__main__':
         help = 'run topic server'
     )
 
-
-
     args = parser.parse_args(namespace = Args)
 
     main = server if args.server else client
