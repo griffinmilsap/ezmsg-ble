@@ -19,6 +19,7 @@ from ezmsg.util.messagecodec import MessageEncoder, MessageDecoder
 
 EZBT = 'ezbt'
 EZBT_ID = int.from_bytes(EZBT.encode(), 'big')
+CHARACTERISTIC_MAX = 512 # bytes
 
 def _ble_uuid(topic: str, type_bytes: bytes) -> uuid.UUID:
     topic_bytes = hashlib.sha1(topic.encode()).digest()[-10:]
@@ -33,6 +34,7 @@ def gen_characteristic_uuid(topic: str) -> uuid.UUID:
 
 class BLETopicServerSettings(ez.Settings):
     topic: str
+    enable_multi: bool = False
 
 class BLETopicServerState(ez.State):
     server: BlessServer
@@ -45,8 +47,8 @@ class BLETopicServer(ez.Unit):
     SETTINGS: BLETopicServerSettings
     STATE: BLETopicServerState
 
-    BROADCAST = ez.InputStream(typing.Any)
-    INCOMING_UPDATE = ez.OutputStream(typing.Any)
+    BROADCAST = ez.InputStream(typing.Union[bytes, typing.Any])
+    INCOMING_UPDATE = ez.OutputStream(typing.Union[bytes, typing.Any])
 
     async def initialize(self) -> None:
 
@@ -106,10 +108,15 @@ class BLETopicServer(ez.Unit):
             yield self.INCOMING_UPDATE, msg
 
     @ez.subscriber(BROADCAST)
-    async def on_stim(self, msg: typing.Any) -> None:
+    async def on_stim(self, msg: typing.Union[bytes, typing.Any]) -> None:
         if self.STATE.characteristic is not None:
-            msg_data = json.dumps(msg, cls = MessageEncoder)
-            self.STATE.characteristic.value = bytearray(msg_data.encode())
+            if not isinstance(msg, bytes):
+                msg = json.dumps(msg, cls = MessageEncoder).encode()
+
+            if len(msg) > CHARACTERISTIC_MAX:
+                raise ValueError('Message too large; not sending')
+
+            self.STATE.characteristic.value = bytearray(msg)
             self.STATE.server.update_value(
                 str(self.STATE.service_uuid), 
                 str(self.STATE.characteristic_uuid)
