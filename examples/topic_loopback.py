@@ -22,12 +22,17 @@ def server(args: Args) -> None:
         OUTPUT_NUMBER = ez.OutputStream(int)
 
         @ez.publisher(OUTPUT_NUMBER_BYTES)
-        async def pub_numbers(self) -> typing.AsyncGenerator:
+        async def count(self) -> typing.AsyncGenerator:
             current_value = 0
             while True:
                 await asyncio.sleep(1.0)
-                yield self.OUTPUT_NUMBER, current_value.to_bytes(4, byteorder = 'big')
+                yield self.OUTPUT_NUMBER_BYTES, current_value.to_bytes(4, byteorder = 'big')
                 current_value += 1
+
+        @ez.subscriber(INPUT_NUMBER_BYTES)
+        @ez.publisher(OUTPUT_NUMBER)
+        async def translate_numbers(self, msg: bytes) -> typing.AsyncGenerator:
+            yield self.OUTPUT_NUMBER, int.from_bytes(msg, byteorder = 'big')
                 
 
     log = DebugLog()
