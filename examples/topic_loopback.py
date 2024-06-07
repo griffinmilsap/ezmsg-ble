@@ -16,14 +16,14 @@ def server(args: Args) -> None:
     
     class Counter(ez.Unit):
 
-        OUTPUT_NUMBER = ez.OutputStream(int)
+        OUTPUT_NUMBER = ez.OutputStream(bytes)
 
         @ez.publisher(OUTPUT_NUMBER)
         async def pub_numbers(self) -> typing.AsyncGenerator:
             current_value = 0
             while True:
                 await asyncio.sleep(1.0)
-                yield self.OUTPUT_NUMBER, current_value
+                yield self.OUTPUT_NUMBER, current_value.to_bytes(4)
                 current_value += 1
 
     log = DebugLog()

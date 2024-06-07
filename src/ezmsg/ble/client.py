@@ -1,5 +1,4 @@
 
-import json
 import asyncio
 import typing
 import uuid
@@ -12,10 +11,7 @@ from bleak import (
 
 import ezmsg.core as ez
 
-from ezmsg.sigproc.sampler import SampleTriggerMessage
-from ezmsg.util.messagecodec import MessageEncoder, MessageDecoder
-
-from .server import gen_characteristic_uuid
+from .server import gen_characteristic_uuid, MIN_MTU
 
 class BLETopicClientSettings(ez.Settings):
     device: str
@@ -25,14 +21,14 @@ class BLETopicClientSettings(ez.Settings):
 class BLETopicClientState(ez.State):
     conn: typing.Optional[BleakClient] = None
     characteristic_uuid: typing.Optional[uuid.UUID] = None
-    queue: asyncio.Queue[str]
+    queue: asyncio.Queue[bytes]
 
 class BLETopicClient(ez.Unit):
     SETTINGS: BLETopicClientSettings
     STATE: BLETopicClientState
 
-    INCOMING_BROADCAST = ez.OutputStream(typing.Any)
-    UPDATE = ez.InputStream(typing.Any)
+    INCOMING_BROADCAST = ez.OutputStream(bytes)
+    UPDATE = ez.InputStream(bytes)
 
     async def initialize(self) -> None:
         self.STATE.queue = asyncio.Queue()
@@ -102,21 +98,26 @@ class BLETopicClient(ez.Unit):
 
 
     @ez.publisher(INCOMING_BROADCAST)
-    async def pub_stims(self) -> typing.AsyncGenerator:
+    async def incoming(self) -> typing.AsyncGenerator:
         while True:
             data = await self.STATE.queue.get()
-            msg = json.loads(data, cls = MessageDecoder)
-            yield self.INCOMING_BROADCAST, msg
+            yield self.INCOMING_BROADCAST, data
 
 
     @ez.subscriber(UPDATE)
-    async def on_trig(self, msg: SampleTriggerMessage) -> None:
+    async def update(self, msg: bytes) -> None:
         if self.STATE.conn is None or self.STATE.characteristic_uuid is None:
             return
         
-        msg_data = json.dumps(msg, cls = MessageEncoder)
+        if not isinstance(msg, bytes):
+            ez.logger.error('Cannot write non-bytes object')
+            return
+
+        if len(msg) > MIN_MTU:
+            ez.logger.warning(f'Notification larger than {MIN_MTU=}; may truncate')
+        
         await self.STATE.conn.write_gatt_char(
             self.STATE.characteristic_uuid,
-            data = bytearray(msg_data.encode()),
+            data = bytearray(msg),
             response = False
         )

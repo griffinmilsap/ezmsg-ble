@@ -1,4 +1,3 @@
-import json
 import uuid
 import typing
 import hashlib
@@ -15,11 +14,9 @@ from bless import (
 
 import ezmsg.core as ez
 
-from ezmsg.util.messagecodec import MessageEncoder, MessageDecoder
-
 EZBT = 'ezbt'
 EZBT_ID = int.from_bytes(EZBT.encode(), 'big')
-CHARACTERISTIC_MAX = 512 # bytes
+MIN_MTU = 23 # Max Transmissable Unit
 
 def _ble_uuid(topic: str, type_bytes: bytes) -> uuid.UUID:
     topic_bytes = hashlib.sha1(topic.encode()).digest()[-10:]
@@ -38,7 +35,7 @@ class BLETopicServerSettings(ez.Settings):
 
 class BLETopicServerState(ez.State):
     server: BlessServer
-    incoming_queue: asyncio.Queue
+    incoming_queue: asyncio.Queue[bytes]
     service_uuid: uuid.UUID
     characteristic_uuid: uuid.UUID
     characteristic: typing.Optional[BlessGATTCharacteristic]
@@ -47,8 +44,8 @@ class BLETopicServer(ez.Unit):
     SETTINGS: BLETopicServerSettings
     STATE: BLETopicServerState
 
-    BROADCAST = ez.InputStream(typing.Union[bytes, typing.Any])
-    INCOMING_UPDATE = ez.OutputStream(typing.Union[bytes, typing.Any])
+    BROADCAST = ez.InputStream(bytes)
+    INCOMING_UPDATE = ez.OutputStream(bytes)
 
     async def initialize(self) -> None:
 
@@ -95,8 +92,7 @@ class BLETopicServer(ez.Unit):
 
     def write_request(self, characteristic: BlessGATTCharacteristic, value: typing.Any, **kwargs):
         characteristic.value = value
-        msg = json.loads(value, cls = MessageDecoder)
-        self.STATE.incoming_queue.put_nowait(msg)
+        self.STATE.incoming_queue.put_nowait(value)
 
     async def shutdown(self) -> None:
         await self.STATE.server.stop()
@@ -108,16 +104,19 @@ class BLETopicServer(ez.Unit):
             yield self.INCOMING_UPDATE, msg
 
     @ez.subscriber(BROADCAST)
-    async def on_stim(self, msg: typing.Union[bytes, typing.Any]) -> None:
-        if self.STATE.characteristic is not None:
-            if not isinstance(msg, bytes):
-                msg = json.dumps(msg, cls = MessageEncoder).encode()
+    async def broadcast(self, msg: bytes) -> None:
+        if self.STATE.characteristic is None:
+            return
+        
+        if not isinstance(msg, bytes):
+            ez.logger.error('Cannot broadcast non-bytes object')
+            return
 
-            if len(msg) > CHARACTERISTIC_MAX:
-                raise ValueError('Message too large; not sending')
+        if len(msg) > MIN_MTU:
+            ez.logger.warning(f'Notification larger than {MIN_MTU=}; may truncate')
 
-            self.STATE.characteristic.value = bytearray(msg)
-            self.STATE.server.update_value(
-                str(self.STATE.service_uuid), 
-                str(self.STATE.characteristic_uuid)
-            )
+        self.STATE.characteristic.value = bytearray(msg)
+        self.STATE.server.update_value(
+            str(self.STATE.service_uuid), 
+            str(self.STATE.characteristic_uuid)
+        )
