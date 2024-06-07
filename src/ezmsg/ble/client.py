@@ -77,7 +77,7 @@ class BLETopicClient(ez.Unit):
                 
                 async def callback_handler(characteristic: BleakGATTCharacteristic, data: bytearray) -> None:
                     if characteristic.uuid == str(self.STATE.characteristic_uuid):
-                        await self.STATE.queue.put(bytes(data).decode())
+                        await self.STATE.queue.put(bytes(data))
 
                 await self.STATE.conn.start_notify(
                     self.STATE.characteristic_uuid, 
@@ -110,7 +110,7 @@ class BLETopicClient(ez.Unit):
             return
         
         if not isinstance(msg, bytes):
-            ez.logger.error('Cannot write non-bytes object')
+            ez.logger.error(f'Cannot write non-bytes object of type: {type(msg)=}')
             return
 
         if len(msg) > MIN_MTU:

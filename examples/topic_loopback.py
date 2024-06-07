@@ -16,15 +16,19 @@ def server(args: Args) -> None:
     
     class Counter(ez.Unit):
 
-        OUTPUT_NUMBER = ez.OutputStream(bytes)
+        OUTPUT_NUMBER_BYTES = ez.OutputStream(bytes)
 
-        @ez.publisher(OUTPUT_NUMBER)
+        INPUT_NUMBER_BYTES = ez.InputStream(bytes)
+        OUTPUT_NUMBER = ez.OutputStream(int)
+
+        @ez.publisher(OUTPUT_NUMBER_BYTES)
         async def pub_numbers(self) -> typing.AsyncGenerator:
             current_value = 0
             while True:
                 await asyncio.sleep(1.0)
-                yield self.OUTPUT_NUMBER, current_value.to_bytes(4)
+                yield self.OUTPUT_NUMBER, current_value.to_bytes(4, byteorder = 'big')
                 current_value += 1
+                
 
     log = DebugLog()
     counter = Counter()
@@ -41,8 +45,9 @@ def server(args: Args) -> None:
         COUNTER = counter,
 
         connections = (
-            (counter.OUTPUT_NUMBER, topic_server.BROADCAST),
-            (topic_server.INCOMING_UPDATE, log.INPUT),
+            (counter.OUTPUT_NUMBER_BYTES, topic_server.BROADCAST),
+            (topic_server.INCOMING_UPDATE, counter.INPUT_NUMBER_BYTES),
+            (counter.OUTPUT_NUMBER, log.INPUT)
         )
     )
 
@@ -53,13 +58,16 @@ def client(args: Args) -> None:
 
     class Loopback(ez.Unit):
 
-        INPUT = ez.InputStream(typing.Any)
-        OUTPUT = ez.OutputStream(typing.Any)
+        INPUT = ez.InputStream(bytes)
+        OUTPUT = ez.OutputStream(bytes)
+        OUTPUT_NUMBER = ez.OutputStream(int)
 
         @ez.subscriber(INPUT)
         @ez.publisher(OUTPUT)
-        async def on_msg(self, msg: typing.Any) -> typing.AsyncGenerator:
+        @ez.publisher(OUTPUT_NUMBER)
+        async def on_msg(self, msg: bytes) -> typing.AsyncGenerator:
             yield self.OUTPUT, msg
+            yield self.OUTPUT_NUMBER, int.from_bytes(msg, 'big')
 
     topic_client = BLETopicClient(
         BLETopicClientSettings(
@@ -79,7 +87,7 @@ def client(args: Args) -> None:
         connections = (
             (topic_client.INCOMING_BROADCAST, loopback.INPUT),
             (loopback.OUTPUT, topic_client.UPDATE),
-            (loopback.OUTPUT, log.INPUT)
+            (loopback.OUTPUT_NUMBER, log.INPUT)
         )
     )
 
