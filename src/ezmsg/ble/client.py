@@ -17,6 +17,7 @@ class BLETopicClientSettings(ez.Settings):
     device: str
     topic: str
     connect_retries: int = 3
+    output_type: typing.Optional[typing.Type] = None
 
 class BLETopicClientState(ez.State):
     conn: typing.Optional[BleakClient] = None
@@ -27,8 +28,8 @@ class BLETopicClient(ez.Unit):
     SETTINGS: BLETopicClientSettings
     STATE: BLETopicClientState
 
-    INCOMING_BROADCAST = ez.OutputStream(bytes)
-    UPDATE = ez.InputStream(bytes)
+    INCOMING_BROADCAST = ez.OutputStream(typing.Union[bytes, typing.Any])
+    UPDATE = ez.InputStream(typing.Union[bytes, typing.Any])
 
     async def initialize(self) -> None:
         self.STATE.queue = asyncio.Queue()
@@ -101,13 +102,17 @@ class BLETopicClient(ez.Unit):
     async def incoming(self) -> typing.AsyncGenerator:
         while True:
             data = await self.STATE.queue.get()
-            yield self.INCOMING_BROADCAST, data
+            from_bytes = getattr(self.SETTINGS.output_type, 'from_bytes', None)
+            yield self.INCOMING_BROADCAST, from_bytes(data) if callable(from_bytes) else data
 
 
     @ez.subscriber(UPDATE)
     async def update(self, msg: bytes) -> None:
         if self.STATE.conn is None or self.STATE.characteristic_uuid is None:
             return
+        
+        to_bytes = getattr(msg, 'to_bytes', None)
+        msg = to_bytes() if callable(to_bytes) else msg
         
         if not isinstance(msg, bytes):
             ez.logger.error(f'Cannot write non-bytes object of type: {type(msg)=}')

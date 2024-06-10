@@ -31,7 +31,7 @@ def gen_characteristic_uuid(topic: str) -> uuid.UUID:
 
 class BLETopicServerSettings(ez.Settings):
     topic: str
-    enable_multi: bool = False
+    output_type: typing.Optional[typing.Type] = None
 
 class BLETopicServerState(ez.State):
     server: BlessServer
@@ -44,8 +44,8 @@ class BLETopicServer(ez.Unit):
     SETTINGS: BLETopicServerSettings
     STATE: BLETopicServerState
 
-    BROADCAST = ez.InputStream(bytes)
-    INCOMING_UPDATE = ez.OutputStream(bytes)
+    BROADCAST = ez.InputStream(typing.Union[bytes, typing.Any])
+    INCOMING_UPDATE = ez.OutputStream(typing.Union[bytes, typing.Any])
 
     async def initialize(self) -> None:
 
@@ -101,12 +101,16 @@ class BLETopicServer(ez.Unit):
     async def pub_triggers(self) -> typing.AsyncGenerator:
         while True:
             msg = await self.STATE.incoming_queue.get()
-            yield self.INCOMING_UPDATE, msg
+            from_bytes = getattr(self.SETTINGS.output_type, 'from_bytes', None)
+            yield self.INCOMING_UPDATE, from_bytes(msg) if callable(from_bytes) else msg
 
     @ez.subscriber(BROADCAST)
     async def broadcast(self, msg: bytes) -> None:
         if self.STATE.characteristic is None:
             return
+
+        to_bytes = getattr(msg, 'to_bytes', None)
+        msg = to_bytes() if callable(to_bytes) else msg
         
         if not isinstance(msg, bytes):
             ez.logger.error('Cannot broadcast non-bytes object')

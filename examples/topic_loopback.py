@@ -1,38 +1,39 @@
 import typing
 import asyncio
-import typing
 
 import ezmsg.core as ez
+
+from ezmsg.util.debuglog import DebugLog
+
+from msg import CountMessage
+
 
 class Args:
     topic: str
     device: str
     server: bool
 
+
 def server(args: Args) -> None:
 
-    from ezmsg.util.debuglog import DebugLog
     from ezmsg.ble.server import BLETopicServer, BLETopicServerSettings
     
     class Counter(ez.Unit):
 
-        OUTPUT_NUMBER_BYTES = ez.OutputStream(bytes)
+        OUTPUT_COUNT = ez.OutputStream(CountMessage)
 
-        INPUT_NUMBER_BYTES = ez.InputStream(bytes)
-        OUTPUT_NUMBER = ez.OutputStream(int)
-
-        @ez.publisher(OUTPUT_NUMBER_BYTES)
+        @ez.publisher(OUTPUT_COUNT)
         async def count(self) -> typing.AsyncGenerator:
             current_value = 0
             while True:
                 await asyncio.sleep(1.0)
-                yield self.OUTPUT_NUMBER_BYTES, current_value.to_bytes(4, byteorder = 'big')
+                yield self.OUTPUT_COUNT, CountMessage.create(
+                    id = 0xBEEF,
+                    count = current_value,
+                    percent = 0.65,
+                    value = 8.598
+                )
                 current_value += 1
-
-        @ez.subscriber(INPUT_NUMBER_BYTES)
-        @ez.publisher(OUTPUT_NUMBER)
-        async def translate_numbers(self, msg: bytes) -> typing.AsyncGenerator:
-            yield self.OUTPUT_NUMBER, int.from_bytes(msg, byteorder = 'big')
                 
 
     log = DebugLog()
@@ -40,7 +41,8 @@ def server(args: Args) -> None:
 
     topic_server = BLETopicServer(
         BLETopicServerSettings(
-            topic = args.topic
+            topic = args.topic,
+            output_type = CountMessage # Define deserialization type by specifying output_type
         )
     )
 
@@ -59,40 +61,24 @@ def server(args: Args) -> None:
 def client(args: Args) -> None:
 
     from ezmsg.ble.client import BLETopicClient, BLETopicClientSettings
-    from ezmsg.util.debuglog import DebugLog
-
-    class Loopback(ez.Unit):
-
-        INPUT = ez.InputStream(bytes)
-        OUTPUT = ez.OutputStream(bytes)
-        OUTPUT_NUMBER = ez.OutputStream(int)
-
-        @ez.subscriber(INPUT)
-        @ez.publisher(OUTPUT)
-        @ez.publisher(OUTPUT_NUMBER)
-        async def on_msg(self, msg: bytes) -> typing.AsyncGenerator:
-            yield self.OUTPUT, msg
-            yield self.OUTPUT_NUMBER, int.from_bytes(msg, 'big')
 
     topic_client = BLETopicClient(
         BLETopicClientSettings(
             device = args.device,
-            topic = args.topic
+            topic = args.topic,
+            output_type = CountMessage, # Comment me to see bytes in debug log
         )
     )
 
     log = DebugLog()
-    loopback = Loopback()
 
     ez.run(
         LOG = log,
         CLIENT = topic_client,
-        LOOPBACK = loopback,
 
         connections = (
-            (topic_client.INCOMING_BROADCAST, loopback.INPUT),
-            (loopback.OUTPUT, topic_client.UPDATE),
-            (loopback.OUTPUT_NUMBER, log.INPUT)
+            (topic_client.INCOMING_BROADCAST, topic_client.UPDATE),
+            (topic_client.INCOMING_BROADCAST, log.INPUT)
         )
     )
 
