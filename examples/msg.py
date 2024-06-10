@@ -72,7 +72,7 @@ class CountMessage:
         This method is a class method, meaning it can be called on the class itself rather than an instance.
         """
 
-        return cls.from_bytes(cls.STRUCT.pack(id, count, int(percent * UINT8_MAX), value))
+        return cls.from_bytes(cls.STRUCT.pack(id, count % UINT8_MAX, int(percent * UINT8_MAX), value))
     
     # Friendly representation
     def __repr__(self) -> str:

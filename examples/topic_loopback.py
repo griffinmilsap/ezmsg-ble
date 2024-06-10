@@ -28,7 +28,7 @@ def server(args: Args) -> None:
             while True:
                 await asyncio.sleep(1.0)
                 yield self.OUTPUT_COUNT, CountMessage.create(
-                    id = 0xBEEF,
+                    id = 0xEF,
                     count = current_value,
                     percent = 0.65,
                     value = 8.598
@@ -52,9 +52,8 @@ def server(args: Args) -> None:
         COUNTER = counter,
 
         connections = (
-            (counter.OUTPUT_NUMBER_BYTES, topic_server.BROADCAST),
-            (topic_server.INCOMING_UPDATE, counter.INPUT_NUMBER_BYTES),
-            (counter.OUTPUT_NUMBER, log.INPUT)
+            (counter.OUTPUT_COUNT, topic_server.BROADCAST),
+            (topic_server.INCOMING_UPDATE, log.INPUT)
         )
     )
 
