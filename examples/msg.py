@@ -6,14 +6,32 @@
 # BLETopicServer/Client both check if your message type has to/from_bytes, and
 # handles message (de)serialization without the need for an intermediary unit
 
+import typing
 import struct
 
-from dataclasses import dataclass, asdict
-
-UINT8_MAX = (2 ** 8) - 1
+from dataclasses import dataclass
 
 @dataclass
-class CountMessage:
+class Serializable(typing.Protocol):
+
+    def __post_init__(self) -> None:
+        for field, value in self.kwargs_from_bytes(self.to_bytes()).items():
+            setattr(self, field, value)
+
+    def to_bytes(self) -> bytes:
+        ...
+
+    @classmethod
+    def kwargs_from_bytes(cls, data: bytes) -> typing.Dict[str, typing.Any]:
+        ...
+    
+    @classmethod
+    def from_bytes(cls, data: bytes):
+        return cls(**cls.kwargs_from_bytes(data))
+    
+
+@dataclass
+class CountMessage(Serializable):
 
     # Underlying data representation in proper order
     # See https://docs.python.org/3/library/struct.html
@@ -21,67 +39,35 @@ class CountMessage:
     # Struct corresponds to field order here
     STRUCT = struct.Struct('<hBBf')
 
-    # Document underlying data representation in variable name
-    id_int16: int = 0
-    count_uint8: int = 0
-    percent_uint8: int = 0
-    value_float32: float = 0
-
-    # Properties to get friendly values
-    @property
-    def id(self) -> int:
-        return self.id_int16
-
-    @property
-    def count(self)-> int:
-        return self.count_uint8
-
-    @property
-    def percent(self) -> float:
-        return self.percent_uint8 / UINT8_MAX
-    
-    @property
-    def value(self) -> float:
-        return self.value_float32
-
+    id: int # int16
+    count: int # uint8
+    percent: float # uint8
+    value: float # float32
+        
     # Serialization and deserialization    
     def to_bytes(self) -> bytes:
-        return self.STRUCT.pack(*asdict(self).values())
-
-    @classmethod
-    def from_bytes(cls, data: bytes):
-        return cls(*cls.STRUCT.unpack(data))
-
-    # A user friendly constructor
-    @classmethod
-    def create(cls, id: int, count: int, percent: float, value: float):
-        """
-        Create a CountMessage with friendlier units
-
-        Parameters:
-        id (int): id for count message [-32768, 32767]
-        count (int): current count value [0, 255]
-        percent (float): a floating point percentage - [0.0 -> 1.0]
-            NOTE: represented internally as a uint8; not all values can be accurately represented
-        value (float): an example float32; again not all Python float (64 bit) values can be accurately represented
-
-        Returns:
-        A properly calculated/validated CountMessage instance
-
-        Notes:
-        This method is a class method, meaning it can be called on the class itself rather than an instance.
-        """
-
-        return cls.from_bytes(cls.STRUCT.pack(id, count % UINT8_MAX, int(percent * UINT8_MAX), value))
+        return self.STRUCT.pack(
+            self.id, 
+            self.count % 0xFF, 
+            max(min(int(self.percent * 0xFF), 0xFF - 1), 0),
+            self.value
+        )
     
-    # Friendly representation
-    def __repr__(self) -> str:
-        return f'CountMessage(id={self.id}, count={self.count}, percent={self.percent}, value={self.value})'
+    @classmethod
+    def kwargs_from_bytes(cls, data: bytes) -> typing.Dict[str, typing.Any]:
+        id, count, percent, value = cls.STRUCT.unpack(data)
+        return dict(
+            id = id,
+            count = count, 
+            percent = percent / 0xFF, 
+            value = value
+        )
+
     
 if __name__ == '__main__':
 
     requested_params = dict(id = 0xAD, count = 56, percent = 0.25, value = 3.14159265358)
-    msg = CountMessage.create(**requested_params)
+    msg = CountMessage(**requested_params)
 
     print('Note that requested params does not exactly match created object due to underlying data represenatations')
     print(f'{requested_params=}')
