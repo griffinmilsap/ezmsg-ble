@@ -41,8 +41,8 @@ class BLETopicServerState(ez.State):
     characteristic: typing.Optional[BlessGATTCharacteristic]
 
 class BLETopicServer(ez.Unit):
-    SETTINGS: BLETopicServerSettings
-    STATE: BLETopicServerState
+    SETTINGS = BLETopicServerSettings
+    STATE = BLETopicServerState
 
     BROADCAST = ez.InputStream(typing.Union[bytes, typing.Any])
     INCOMING_UPDATE = ez.OutputStream(typing.Union[bytes, typing.Any])

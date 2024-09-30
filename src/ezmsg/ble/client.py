@@ -25,8 +25,8 @@ class BLETopicClientState(ez.State):
     queue: asyncio.Queue[bytes]
 
 class BLETopicClient(ez.Unit):
-    SETTINGS: BLETopicClientSettings
-    STATE: BLETopicClientState
+    SETTINGS = BLETopicClientSettings
+    STATE = BLETopicClientState
 
     INCOMING_BROADCAST = ez.OutputStream(typing.Union[bytes, typing.Any])
     UPDATE = ez.InputStream(typing.Union[bytes, typing.Any])
