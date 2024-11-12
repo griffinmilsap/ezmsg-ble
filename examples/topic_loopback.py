@@ -27,7 +27,7 @@ def server(args: Args) -> None:
             current_value = 0
             while True:
                 await asyncio.sleep(1.0)
-                yield self.OUTPUT_COUNT, CountMessage.create(
+                yield self.OUTPUT_COUNT, CountMessage(
                     id = 0xEF,
                     count = current_value,
                     percent = 0.65,
